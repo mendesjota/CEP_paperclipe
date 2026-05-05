@@ -6,13 +6,21 @@ import os
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
+try:
+    from cep import get_cep_from_address, get_address_from_cep, format_address, clear_cache
+except ImportError:
+    # Fallback if direct import doesn't work
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'cep'))
+    from cep import get_cep_from_address, get_address_from_cep, format_address, clear_cache
+
 class TestCEPFunctions(unittest.TestCase):
+
+    def setUp(self):
+        clear_cache()
     
     @patch('requests.get')
     def test_get_cep_from_address_success(self, mock_get):
         """Test successful CEP lookup from address"""
-        from src.cep import get_cep_from_address
-        
         # Mock successful response
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -32,8 +40,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_cep_from_address_not_found(self, mock_get):
         """Test CEP lookup when address not found"""
-        from src.cep import get_cep_from_address
-        
         # Mock response with no results
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -46,8 +52,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_cep_from_address_error(self, mock_get):
         """Test CEP lookup when API returns error"""
-        from src.cep import get_cep_from_address
-        
         # Mock error response
         mock_response = MagicMock()
         mock_response.status_code = 400
@@ -59,7 +63,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_cep_from_address_timeout(self, mock_get):
         """Test CEP lookup timeout handling"""
-        from src.cep import get_cep_from_address
         import requests
         
         # Mock timeout exception
@@ -71,7 +74,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_cep_from_address_connection_error(self, mock_get):
         """Test CEP lookup connection error handling"""
-        from src.cep import get_cep_from_address
         import requests
         
         # Mock connection error
@@ -82,8 +84,6 @@ class TestCEPFunctions(unittest.TestCase):
     
     def test_format_address(self):
         """Test address formatting function"""
-        from src.cep import format_address
-        
         # Test basic formatting
         formatted = format_address('rua augusta, sao paulo')
         self.assertEqual(formatted, 'Rua Augusta, Sao Paulo')
@@ -95,8 +95,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_address_from_cep_success(self, mock_get):
         """Test successful address lookup from CEP"""
-        from src.cep import get_address_from_cep
-        
         # Mock successful response
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -123,8 +121,6 @@ class TestCEPFunctions(unittest.TestCase):
     @patch('requests.get')
     def test_get_address_from_cep_invalid_format(self, mock_get):
         """Test address lookup with invalid CEP format"""
-        from src.cep import get_address_from_cep
-        
         # Test various invalid formats
         result = get_address_from_cep('12345')  # Too short
         self.assertIsNone(result)

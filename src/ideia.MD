@@ -43,7 +43,7 @@ Crie uma pasta com todos os testes, garanta que o código supra todos os requisi
 |-----|----------|------|----------------|----------|-------------------------|-------|-----------|-----|-----|
 
 ### Saída: Lista para Envio (CSV) - Formato Correios
-| Prefixo | Nome | ... | CPF | CEP | ... | Endereço | Bairro | Cidade | UF | Flag | Complemento | Número |
+| Prefixo (coluna A) | Nome (coluna B) | --- (coluna C,D, E) "Vazios" | | CPF (Coluna F) | CEP (coluna G) | ... (coluna H) "vazio"  | Endereço (coluna I) | Bairro (coluna J) | Cidade (coluna K) | UF (coluna L) | Flag (coluna M) | Complemento (coluna N) | Número (coluna O)|
 |--------|------|-----|-----|-----|-----|---------|--------|--------|---|---|------|------------|--------|
 
 ---

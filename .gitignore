@@ -1,4 +1,48 @@
+# ============================================================
+# DADOS SENSÍVEIS — NUNCA versionar (CPF/CEP/endereços reais)
+# ============================================================
+# Planilhas e CSVs de dados (prova de vida, listas, resultados, saídas do app)
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+~$*.xlsx
+Exemplos de planilha/
+"Exemplos de planilha"/
+
+# Relatórios de erro do Correios e logs de processamento (contêm CPF/endereço)
+Problema_*.txt
+*_correios*.txt
+*lista_correios*.txt
+erros_ceps*.xlsx
+erros_ceps*.csv
+CLAUDE.md
+
+# Bases / cache de CEP locais e bancos de dados
+*.sqlite
+*.sqlite3
+*.db
+cep_local.*
+cep_cache*
+
+# Arquivos compactados (lotes / exportações podem conter dados)
+*.zip
+*.rar
+*.7z
+
+# Credenciais e segredos
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+credentials.json
+token*.json
+secrets*.json
+
+# ============================================================
 # Python
+# ============================================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -26,18 +70,16 @@ venv/
 ENV/
 env/
 
-# IDE
+# ============================================================
+# IDE / Ferramentas
+# ============================================================
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 *~
-
-# Datos sensitiveis - Planilhas
-"Exemplos de planilha"/
-*.xlsx
-*.csv
-~$*.xlsx
+*.bak
 
 # Logs
 *.log

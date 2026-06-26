@@ -1,205 +1,114 @@
-# CEP Paperclipe - Sistema de Validação e Correção de CEPs
+# CEP Paperclipe — Validação e Correção de CEPs para envio aos Correios
 
-Sistema para processar planilhas de prova de vida, validar CEPs automaticamente, corrigir CEPs inválidos usando APIs públicas e gerar arquivos prontos para envio aos Correios.
-
----
-
-## Problema
-
-Muitos beneficiários informam CEPs incorretos ou CEPs gerais da localidades (ex: CEP da cidade ao invés do CEP específico do endereço), o que causa erros no envio de cartas pelos Correios.
-
-Este sistema resolve esse problema validando cada CEP e, quando necessário, buscando o CEP correto usando o endereço completo.
+Aplicação web (Streamlit) que recebe a planilha de prova de vida, **valida e corrige os CEPs na base oficial dos Correios** e gera os arquivos prontos para importação no sistema do Correios — separando automaticamente o que precisa de **revisão manual**.
 
 ---
 
-## Formato das Planilhas
+## Como rodar (passo a passo no terminal)
 
-### Entrada: Prova de Vida (Excel)
+Abra o **PowerShell** e execute:
 
-| CPF | MATRICULA | NOME | DATA NASCIMENTO | ENDERECO | COMPLEMENTO DO ENDERECO | BAIRRO | MUNICIPIO | UF | CEP |
-|-----|----------|------|----------------|----------|-------------------------|-------|-----------|-----|-----|
-| 12345678901 | 001234 | JOAO SILVA | 15/03/1980 | QUADRA SHIGS 706 | CASA 15 | ASA SUL | BRASILIA | DF | 70350756 |
-
-### Saída: 4 Planilhas Excel
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `1_ceps_validos.xlsx` | Apenas os CEPs originais que já estavam corretos |
-| `2_ceps_corrigidos.xlsx` | CEPs que a API encontrou e corrigiu via endereço |
-| `3_ceps_nao_encontrados.xlsx` | CEPs inválidos que a API não encontrou |
-| `4_base_consolidada.xlsx` | Base inteira com colunas `Novo_CEP` e `Status_Processamento` |
-
----
-
-## Status de Processamento
-
-| Status | Significado |
-|--------|-------------|
-| **Válido** | CEP original está correto e existe na API |
-| **Corrigido** | CEP estava errado/inválido, a API encontrou o correto via endereço |
-| **Não Encontrado** | CEP inválido e a API não encontrou correspondência |
-
----
-
-## Fluxo de Processamento
-
+```powershell
+cd "c:\Users\jose.junior\Desktop\Python\Projetos\CEP_Paperclipe\CEP_paperclipe\src"
+.\.venv\Scripts\streamlit.exe run app.py
 ```
-1. Upload Planilha Excel (.xlsx)
-         ↓
-2. Validar CEP (formato 8 dígitos + existência na API)
-         ↓
-3. Se inválido → Buscar CEP por endereço (ENDERECO + COMPLEMENTO + BAIRRO + MUNICIPIO + UF)
-         ↓
-4. Gerar 4 planilhas de saída
+
+O navegador abre sozinho em **http://localhost:8501**.
+Para **parar** o programa: `Ctrl + C` no terminal.
+
+> Se a porta 8501 já estiver em uso, force outra (ou a mesma após parar a anterior):
+> ```powershell
+> .\.venv\Scripts\streamlit.exe run app.py --server.port 8502
+> ```
+
+Primeira vez na máquina (instalar dependências):
+
+```powershell
+cd "c:\Users\jose.junior\Desktop\Python\Projetos\CEP_Paperclipe\CEP_paperclipe\src"
+.\.venv\Scripts\pip.exe install -r requirements.txt
 ```
 
 ---
 
-## Como o Código Funciona
+## Como usar (passo a passo na tela)
 
-### 1. Validação do CEP
+1. Faça **upload** da planilha Excel de prova de vida (`.xlsx`).
+2. Clique em **Processar Planilha**.
+   - O sistema consulta a base oficial (ViaCEP/DNE) para cada CEP novo, então um lote grande leva alguns segundos por CEP inédito. Há cache: CEPs repetidos são instantâneos.
+3. Veja os números: **Total · Válidos · Corrigidos · Revisão manual**.
+4. Baixe os arquivos (ver abaixo).
 
-```python
-def validar_formato_cep(cep):
-    cep_limpo = ''.join(filter(str.isdigit, str(cep)))
-    return len(cep_limpo) == 8 and cep_limpo.isdigit()
-```
+### Planilha de entrada (colunas esperadas)
 
-- Se o CEP tiver menos de 8 dígitos → **INVÁLIDO**
-- Se o CEP tiver letras → **INVÁLIDO**
-- Se o CEP tiver 8 dígitos → **VÁLIDO (formato)**
+`CPF | MATRICULA | NOME | DATA NASCIMENTO | ENDERECO | COMPLEMENTO DO ENDERECO | BAIRRO | MUNICIPIO | UF | CEP`
 
-### 2. Verificar se o CEP existe na API
-
-```python
-def verificar_cep_existe(cep):
-    # Tenta AwesomeAPI
-    url = f"https://cep.awesomeapi.com.br/json/{cep}"
-    res = requests.get(url, timeout=5)
-    if res.status_code == 200 and 'cep' in res.json():
-        return dados  # CEP existe
-    
-    # Tenta ViaCEP como backup
-    url = f"https://viacep.com.br/ws/{cep}/json/"
-    res = requests.get(url, timeout=5)
-    if res.status_code == 200 and 'erro' not in res.json():
-        return dados
-    
-    return None  # Não encontrado
-```
-
-### 3. Busca de CEP por Endereço
-
-Quando o CEP está inválido ou não existe, o código busca usando o endereço:
-
-```
-QUERY = UF + MUNICIPIO + BAIRRO + ENDERECO + COMPLEMENTO
-```
-
-**Exemplo:**
-- UF: GO | MUNICIPIO: AGUAS LINDAS DE GOIAS | BAIRRO: PARQUE DA BARRAGEM V
-- ENDERECO: QUADRA QUADRA 14 | COMPLEMENTO: CASA 71
-- **Query:** `GO AGUAS LINDAS DE GOIAS PARQUE DA BARRAGEM V QUADRA QUADRA 14 CASA 71`
-
-### 4. APIs de Busca (3 em cascata)
-
-| # | API | Endpoint | Tipo |
-|---|-----|----------|------|
-| 1 | CepRua | `ceprua.com.br/api/buscar?q={query}` | Texto livre (prioritário) |
-| 2 | AwesomeAPI | `cep.awesomeapi.com.br/search?q={query}` | Texto livre |
-| 3 | ViaCEP | `viacep.com.br/ws/{UF}/{Cidade}/{Logradouro}/json/` | Parâmetros separados |
-
-### 5. Normalização de Endereços
-
-O código normaliza abreviações para melhorar a taxa de sucesso:
-
-| Abreviação | Normalizado |
-|------------|-------------|
-| R | RUA |
-| AV | AVENIDA |
-| QD / QN | QUADRA |
-| CS | CASA |
-| AP | APARTAMENTO |
-| BL | BLOCO |
-| LT | LOTE |
-| CONJ / CJ | CONJUNTO |
-
-### 6. Limpeza de Palavras Duplicadas
-
-Remove palavras duplicadas em sequência:
-- `"QUADRA QUADRA"` → `"QUADRA"`
-- `"RUA RUA RUA"` → `"RUA"`
+(Há um botão **Baixar Modelo** na própria tela.)
 
 ---
 
-## Estrutura de Arquivos
+## O que o sistema faz com cada CEP
 
-```
-CEP_paperclipe/
-├── src/
-│   ├── app.py                  # Interface Streamlit
-│   ├── ideia.MD                # Base de conhecimento
-│   ├── tests/
-│   │   ├── test_funcoes.py     # Testes unitários
-│   │   └── test_api.py         # Testes de integração
-│   └── requirements.txt         # Dependências
-├── README.md
-└── .gitignore
-```
+Para cada registro, o CEP é classificado em um de três status:
+
+| Status | O que significa | Vai para o envio? |
+|--------|------------------|-------------------|
+| **Válido** | O CEP informado existe na base oficial e a UF confere. | Sim |
+| **Corrigido** | O CEP estava errado/ausente/com UF divergente, e o sistema encontrou o **CEP correto pelo endereço** (busca por logradouro no ViaCEP), confirmando a UF. | Sim |
+| **Revisão** | Não foi possível corrigir com segurança (CEP inexistente sem endereço resolvível) **ou o CPF é inválido**. | Não — vai para revisão manual |
+
+**Regra de segurança:** nenhum CEP entra no arquivo de envio sem existir na base oficial e ter a UF confirmada. O sistema **não “inventa” CEP**.
 
 ---
 
-## Como Executar
+## Arquivos gerados (downloads)
 
-### Via Streamlit (Navegador)
+| Arquivo | Conteúdo | Uso |
+|---------|----------|-----|
+| **envio_correios.csv** | Apenas registros **Válidos + Corrigidos**, no formato de importação do Correios (`SR(A);...`). | É o arquivo que vai para o Correios. |
+| **Blocos de 300** | O mesmo envio dividido em lotes de 300 linhas. | Quando o sistema do Correios exige lotes menores. |
+| **revisao_manual.xlsx** | Registros que caíram em **Revisão**, com a coluna **MOTIVO** explicando o problema. | Lista para a equipe tratar manualmente. |
+| **base_consolidada.xlsx** | **Todos** os registros com `CEP_INFORMADO`, `CEP_FINAL`, `STATUS` e `MOTIVO`. | Auditoria/conferência completa. |
 
-```bash
-cd src
-.venv\Scripts\streamlit.exe run app.py
-```
+### Como tratar a `revisao_manual.xlsx`
 
-Acesse: http://localhost:8501
+A coluna **MOTIVO** diz o que corrigir:
+
+- **`CPF/CNPJ com N dígitos (esperado 11 ou 14)`** → o CPF está errado na origem. **Só o cadastro (SIAPE/sistema) corrige** — nenhum serviço de CEP resolve isso. Acerte o CPF na planilha e reprocesse.
+- **`CEP não encontrado na base oficial`** → confira o endereço (logradouro/bairro). Com o endereço certo, ao reprocessar o sistema costuma achar o CEP.
+- **`CEP pertence a XX, diferente da UF informada (YY)`** → UF ou CEP digitado errado; ajuste e reprocesse.
+- **`CEP com formato inválido (≠ 8 dígitos)`** → CEP truncado/colado errado; corrija e reprocesse.
+
+Fluxo recomendado: corrija os itens da revisão na planilha original → reprocesse → a revisão diminui a cada rodada.
 
 ---
 
-## Executar Testes
+## Como funciona por dentro (resumo técnico)
 
-```bash
-cd src
-.venv\Scripts\python.exe tests/test_funcoes.py
-```
+1. **Normalização**: CPF para 11 dígitos (sem truncar — se vier com mais, é marcado inválido); CEP para 8 dígitos (completa zero à esquerda; não trunca).
+2. **Validação na base oficial**: consulta o CEP no **ViaCEP** (espelha o DNE dos Correios) — confere existência, UF e cidade.
+3. **Correção por endereço** (quando o CEP falha): busca **endereço → CEP** por logradouro no ViaCEP (retorna o CEP exato), com desambiguação por bairro/bloco; reserva: busca textual no CepRua. Sempre confirmando a UF.
+4. **Saída**: monta os arquivos e separa a revisão manual.
+
+> A função de consulta é **desacoplada**: no futuro dá para trocar o ViaCEP pela **API CEP oficial dos Correios** (exige token do contrato) sem mexer no resto.
 
 ---
 
 ## Dependências
 
 ```
-pandas
-requests
-openpyxl
 streamlit
+requests
+pandas
+openpyxl
 ```
 
----
-
-## Limites Técnicos
-
-| Item | Limite |
-|------|--------|
-| Lote Correios | 300 objetos por envio |
-| Delay entre requisições | 0.1 segundos |
-| Timeout API | 5 segundos |
+(instaladas no ambiente virtual `src/.venv`)
 
 ---
 
-## Histórico de Versões
+## Observações importantes
 
-| Versão | Data | Descrição |
-|--------|------|-----------|
-| 3.0 | 2026-05-07 | Versão atual seguindo ideia.MD - 4 planilhas de saída + testes |
-
----
-
-## Contato
-
-Desenvolvedor responsável pelo projeto.
+- **Tudo é tratado como TEXTO** para não perder zeros à esquerda de CPF e CEP.
+- O arquivo de envio usa o formato `SR(A);NOME;;;;CPF;CEP;;ENDERECO;BAIRRO;MUNICIPIO;UF;N;COMPLEMENTO;0`.
+- Processamento depende de internet (consulta o ViaCEP).
+- Dados sensíveis (planilhas reais) **não** ficam no repositório (ver `.gitignore`).

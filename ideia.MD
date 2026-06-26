@@ -26,6 +26,41 @@ Sistema para processar planilhas de prova de vida, buscar CEPs automaticamente e
 
 ---
 
+## 4 Planilhas de Saída
+
+### 1_ceps_validos.xlsx - Dados ORIGINAIS (modelo Correios)
+- Conteúdo: Todos os registros com CEP original da planilha
+- Formato: Excel com colunas: PREFIXO, NOME, CPF, CEP, LOGRADOURO, ENDERECO, BAIRRO, MUNICIPIO, UF, FLAG, COMPLEMENTO, NUMERO
+- Todas as células em formato TEXTO
+- Uso: Lista de envio com dados originais
+
+### 2_ceps_corrigidos.xlsx - Dados CORRIGIDOS (modelo Correios)
+- Conteúdo: CEPs válidos + CEPs sugeridos (para não encontrados)
+- Regra: Se CEP validado → usa CEP válido; Se não validado → usa CEP sugerido
+- Formato: Excel com colunas: PREFIXO, NOME, CPF, CEP, LOGRADOURO, ENDERECO, BAIRRO, MUNICIPIO, UF, FLAG, COMPLEMENTO, NUMERO
+- Todas as células em formato TEXTO
+- Uso: Lista de envio com CEPs corrigidos/sugeridos
+
+### 3_ceps_nao_encontrados.xlsx - Log de ERROS
+- Conteúdo: Apenas registros onde CEP não foi validado
+- Colunas:
+  - Nome, CPF, Endereco, Complemento, Bairro, Municipio, UF (dados originais)
+  - CEP_ORIGINAL (CEP da planilha)
+  - CEP_INPUTADO (CEP verificado na API)
+  - CEP_SUGERIDO (CEP encontrado pelo fallback)
+- Uso: Lista para revisão manual
+
+### 4_base_consolidada.xlsx - Dados ORIGINAIS + MODIFICADOS
+- Conteúdo: Todos os registros da planilha original + colunas de resultado
+- Colunas adicionadas:
+  - CEP_CORRIGIDO (CEP válido ou sugerido)
+  - STATUS (Válido / Não encontrado / Formato inválido)
+  - MODIFICADO (Sim / Não)
+  - CEP_SUGERIDO (para não encontrados)
+- Uso: Análise completa de resultados
+
+---
+
 ## APIs de Busca CEP (3 em cascata)
 
 | # | API | Endpoint | Tipo |
@@ -104,6 +139,33 @@ CEP_paperclipe/
 - **Ambiente**: homologação (testes) ou produção
 - **Dados necessários**: usuário, senha componente, cartão postagem
 - **Serviço**: API Pré-Postagem (código 86720)
+
+---
+
+## ⚠️ Regra Importante: Tratar como TEXTO
+
+**Todos os dados devem ser tratados como string (texto)** para evitar perda de zeros à esquerda.
+
+- **CEP** pode começar com 0 (ex: 01234567)
+- **CPF** pode começar com 0 (ex: 01234567890)
+- Ao ler Excel: usar `dtype=str`
+- Ao gerar Excel: forçar tipo string com `.astype(str)`
+- Ao salvar Excel: usar openpyxl com células forçadas como texto (não general/number)
+- **Todas as colunas de TODAS as planilhas Excel devem ter formato TEXTO (@)** para evitar perda de zeros à esquerda em CEPs e CPFs
+  - Usar `cell.number_format = numbers.FORMAT_TEXT` em cada célula
+- **CSV (arquivos .csv)**: TODOS os campos devem ter aspas duplas para forçar interpretação como texto
+  - Formato: `SR(A);"NOME";"CPF";"CEP";"";"ENDERECO";"BAIRRO";"MUNICIPIO";"UF";"N";"COMPLEMENTO";"0"`
+  - Isso evita que CEP e CPF sejam interpretados como números pelo Excel
+- **Normalização de CPF e CEP**:
+  - CPF deve ter sempre 11 dígitos: usar `zfill(11)` para completar com zeros à esquerda
+  - CEP deve ter sempre 8 dígitos: usar `zfill(8)` para completar com zeros à esquerda
+  - Exemplo: CPF "175340110" → "00175340110" | CEP "71065907" → "071065907"
+- **Botões de download**: usar session_state para persistir os dados processados - os botões devem continuar visíveis após o clique para permitir baixar todas as planilhas
+- **Fallback para CEPs não encontrados**: para CEPs com status "Não encontrado", fazer busca adicional usando:
+  1. ENDERECO + COMPLEMENTO DO ENDERECO + BAIRRO + MUNICIPIO + UF
+  2. Se não encontrar: ENDERECO + BAIRRO + MUNICIPIO + UF
+  3. Se ainda não encontrar: BAIRRO + MUNICIPIO + UF (CEP geral do bairro)
+  - Adicionar coluna "CEP_SUGERIDO" na planilha consolidada
 
 ---
 
